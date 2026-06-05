@@ -1,0 +1,52 @@
+name: JVT Studio Monitor
+
+on:
+  schedule:
+    # Runs every 30 minutes. GitHub cron is UTC and best-effort; under load it
+    # may be delayed by a few minutes.
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}  # allow manual "Run workflow" from the Actions tab
+
+# Needed so the workflow can commit the updated state file back to the repo.
+permissions:
+  contents: write
+
+concurrency:
+  group: jvt-studio-monitor
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r property_monitor/requirements.txt
+
+      - name: Run monitor
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PF_MAX_PRICE: "600000"
+          PF_STATE_FILE: seen_listings.json
+        run: python property_monitor/check.py
+
+      - name: Persist seen-listings state
+        if: always()
+        run: |
+          if [[ -n "$(git status --porcelain seen_listings.json)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add seen_listings.json
+            git commit -m "chore: update seen JVT studio listings [skip ci]"
+            git push
+          else
+            echo "No state changes to commit."
+          fi
