@@ -43,6 +43,9 @@ STATE_FILE = Path(os.environ.get("PF_STATE_FILE", "seen_listings.json"))
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
+# Where the auto-detected chat ID is cached so it only has to be discovered
+# once (the workflow commits this back to the repo).
+CHAT_ID_FILE = Path(os.environ.get("TELEGRAM_CHAT_ID_FILE", "telegram_chat_id.txt"))
 
 # Optional: route page fetches through a scraping API with residential IPs +
 # JS rendering. Set SCRAPER_API_KEY (and optionally SCRAPER_API_ENDPOINT) if
@@ -235,10 +238,53 @@ def save_seen(ids: set[str]) -> None:
 
 # --- Notifying -------------------------------------------------------------
 
+def resolve_chat_id() -> str:
+    """Figure out which Telegram chat to message.
+
+    Order of preference:
+      1. The TELEGRAM_CHAT_ID env var, if set.
+      2. A previously auto-detected ID cached in CHAT_ID_FILE.
+      3. Auto-detect: ask Telegram for recent messages sent to the bot and use
+         the most recent chat. This means the user only has to send their bot a
+         message once -- no hunting for their numeric ID.
+    The detected ID is cached so detection only happens on first setup.
+    """
+    if TELEGRAM_CHAT_ID:
+        return TELEGRAM_CHAT_ID
+    if CHAT_ID_FILE.exists():
+        cached = CHAT_ID_FILE.read_text().strip()
+        if cached:
+            return cached
+    if not TELEGRAM_BOT_TOKEN:
+        return ""
+    try:
+        resp = requests.get(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates",
+            timeout=30,
+        )
+        updates = resp.json().get("result", [])
+        for update in reversed(updates):  # newest first
+            message = update.get("message") or update.get("my_chat_member") or {}
+            chat = message.get("chat", {})
+            if chat.get("id") is not None:
+                chat_id = str(chat["id"])
+                CHAT_ID_FILE.write_text(chat_id)
+                print(f"Auto-detected Telegram chat ID and cached it: {chat_id}")
+                return chat_id
+    except (requests.RequestException, ValueError) as exc:
+        print(f"Could not auto-detect chat ID: {exc}", file=sys.stderr)
+    print("WARNING: No Telegram chat ID yet. Send your bot a message in "
+          "Telegram, then re-run.", file=sys.stderr)
+    return ""
+
+
 def send_telegram(listings: list[dict]) -> None:
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        print("WARNING: TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not set; "
-              "skipping notification.", file=sys.stderr)
+    if not TELEGRAM_BOT_TOKEN:
+        print("WARNING: TELEGRAM_BOT_TOKEN not set; skipping notification.",
+              file=sys.stderr)
+        return
+    chat_id = resolve_chat_id()
+    if not chat_id:
         return
     api = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     for listing in listings:
@@ -253,7 +299,7 @@ def send_telegram(listings: list[dict]) -> None:
         resp = requests.post(
             api,
             data={
-                "chat_id": TELEGRAM_CHAT_ID,
+                "chat_id": chat_id,
                 "text": text,
                 "parse_mode": "HTML",
                 "disable_web_page_preview": "false",

@@ -32,20 +32,21 @@ jobs:
 
       - name: Run monitor
         env:
+          # Only the bot token is required. The chat ID is auto-detected on the
+          # first run (just message your bot once) and cached in the repo.
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           PF_MAX_PRICE: "600000"
           PF_STATE_FILE: seen_listings.json
         run: python property_monitor/check.py
 
-      - name: Persist seen-listings state
+      - name: Persist state (seen listings + detected chat ID)
         if: always()
         run: |
-          if [[ -n "$(git status --porcelain seen_listings.json)" ]]; then
+          if [[ -n "$(git status --porcelain seen_listings.json telegram_chat_id.txt)" ]]; then
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add seen_listings.json
-            git commit -m "chore: update seen JVT studio listings [skip ci]"
+            git add seen_listings.json telegram_chat_id.txt
+            git commit -m "chore: update monitor state [skip ci]"
             git push
           else
             echo "No state changes to commit."
