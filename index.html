@@ -45,6 +45,14 @@
   #rec:hover { background: #efd8b4; transform: translateY(-1px); }
   #rec:active { transform: translateY(0); }
   #rec:disabled { opacity: .6; cursor: default; }
+  #dur {
+    position: fixed; right: 18px; bottom: 100px;
+    font: 600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #e8e8ea; background: rgba(20,20,26,.85); border: 1px solid rgba(255,255,255,.14);
+    border-radius: 999px; padding: 7px 12px; cursor: pointer; z-index: 11;
+    box-shadow: 0 6px 18px rgba(0,0,0,.35);
+  }
+  #dur:disabled { opacity: .6; cursor: default; }
 </style>
 </head>
 <body>
@@ -53,6 +61,13 @@
   <div id="loader">preparing the scene…</div>
   <button id="snap" title="Render a high-resolution PNG">📸 Save photo</button>
   <button id="rec" title="Record a 360° turntable video">🎞 Record spin</button>
+  <select id="dur" title="Turntable spin length (seamless loop)">
+    <option value="4">4s spin</option>
+    <option value="6">6s spin</option>
+    <option value="8" selected>8s spin</option>
+    <option value="12">12s spin</option>
+    <option value="16">16s spin</option>
+  </select>
 
   <script type="importmap">
   {
@@ -482,6 +497,7 @@
 
   // ---------- 360° turntable video recording ----------
   const recBtn = document.getElementById('rec');
+  const durSel = document.getElementById('dur');
   let recording = false;
 
   function pickMime() {
@@ -507,9 +523,10 @@
     recording = true;
     recBtn.disabled = true;
     snapBtn.disabled = true;
+    durSel.disabled = true;
     const label = recBtn.textContent;
 
-    const seconds = 8;
+    const seconds = parseFloat(durSel.value) || 8;
     const mime = pickMime();
     const ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm';
     const stream = renderer.domElement.captureStream(60);
@@ -527,6 +544,7 @@
       recording = false;
       recBtn.disabled = false;
       snapBtn.disabled = false;
+      durSel.disabled = false;
       recBtn.textContent = label;
       controls.autoRotate = true;
     };
@@ -542,12 +560,14 @@
 
     function spin() {
       const frac = (performance.now() - t0) / 1000 / seconds;
-      sph.theta = startTheta + Math.min(frac, 1) * Math.PI * 2;
+      // Stop *before* drawing the full-revolution frame: theta=2π equals the
+      // start frame, so omitting it keeps the looped video seamless.
+      if (frac >= 1) { rec.stop(); return; }
+      sph.theta = startTheta + frac * Math.PI * 2;
       camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(sph));
       camera.lookAt(controls.target);
-      recBtn.textContent = `Recording ${Math.ceil(seconds * (1 - Math.min(frac, 1)))}s…`;
-      if (frac < 1) requestAnimationFrame(spin);
-      else rec.stop();
+      recBtn.textContent = `Recording ${Math.ceil(seconds * (1 - frac))}s…`;
+      requestAnimationFrame(spin);
     }
     spin();
   });

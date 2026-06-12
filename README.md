@@ -38,8 +38,10 @@ avoids module/CORS quirks.)
 **Save photo:** click **📸 Save photo** (bottom-right) to render a crisp
 ~3000px PNG of the current view and download it.
 
-**Record spin:** click **🎞 Record spin** to capture an 8-second 360°
-turntable as a video (MP4 where supported, otherwise WebM). Recording uses
-the canvas `captureStream` + `MediaRecorder` API — best in Chrome/Edge.
+**Record spin:** pick a length from the dropdown (4–16s) and click
+**🎞 Record spin** to capture a 360° turntable as a video (MP4 where
+supported, otherwise WebM). The rotation ends one frame short of a full
+revolution so the clip **loops seamlessly**. Recording uses the canvas
+`captureStream` + `MediaRecorder` API — best in Chrome/Edge.
 
 [Three.js]: https://threejs.org
