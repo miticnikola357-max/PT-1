@@ -72,8 +72,8 @@
   <script type="importmap">
   {
     "imports": {
-      "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.165.0/examples/jsm/"
+      "three": "./vendor/three.module.js",
+      "three/addons/": "./vendor/addons/"
     }
   }
   </script>
@@ -90,7 +90,7 @@
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 0.98;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -208,7 +208,7 @@
       clearcoat: opts.clearcoat ?? 0.0,
       sheen: opts.sheen ?? 0.0,
       sheenColor: new THREE.Color(opts.sheenColor ?? 0xffffff),
-      envMapIntensity: 0.8,
+      envMapIntensity: opts.envMapIntensity ?? 0.4,
       attenuationColor: new THREE.Color(opts.attenuationColor ?? color),
       attenuationDistance: opts.attenuationDistance ?? 0.6,
     });
@@ -224,24 +224,24 @@
     return THREE.MathUtils.lerp(rB, rT, THREE.MathUtils.clamp(t, 0, 1));
   }
 
-  // bottom: strawberry purée (red, slightly translucent)
-  drinkGroup.add(liquidLayer(baseY, 0.62, rAt(baseY), rAt(0.62), 0xb11f1c,
-    { roughness: 0.25, transmission: 0.25, thickness: 0.8, attenuationColor: 0x7a0f0d, attenuationDistance: 0.4 }));
+  // bottom: strawberry purée (deep, saturated red)
+  drinkGroup.add(liquidLayer(baseY, 0.62, rAt(baseY), rAt(0.62), 0x8e1410,
+    { roughness: 0.3, transmission: 0.12, thickness: 0.8, attenuationColor: 0x5e0a08, attenuationDistance: 0.35 }));
   // thin blend band
-  drinkGroup.add(liquidLayer(0.62, 0.72, rAt(0.62), rAt(0.72), 0xd98a78, { roughness: 0.4 }));
-  // middle: milk / yoghurt (white)
-  drinkGroup.add(liquidLayer(0.72, 1.30, rAt(0.72), rAt(1.30), 0xf6f1e9,
-    { roughness: 0.5, sheen: 0.4, sheenColor: 0xfff6ee }));
+  drinkGroup.add(liquidLayer(0.62, 0.72, rAt(0.62), rAt(0.72), 0xc66a55, { roughness: 0.45 }));
+  // middle: milk / yoghurt (creamy white)
+  drinkGroup.add(liquidLayer(0.72, 1.30, rAt(0.72), rAt(1.30), 0xf1e7d4,
+    { roughness: 0.55, sheen: 0.3, sheenColor: 0xfff2e2 }));
   // blend band milk->matcha
-  drinkGroup.add(liquidLayer(1.30, 1.42, rAt(1.30), rAt(1.42), 0xcdd9a8, { roughness: 0.5 }));
-  // top: matcha (green) — the large portion
-  drinkGroup.add(liquidLayer(1.42, 2.24, rAt(1.42), rAt(2.24), 0x9bb45a,
-    { roughness: 0.45, sheen: 0.35, sheenColor: 0xe8f0c8 }));
+  drinkGroup.add(liquidLayer(1.30, 1.42, rAt(1.30), rAt(1.42), 0xc2cf94, { roughness: 0.5 }));
+  // top: matcha (vivid green) — the large portion
+  drinkGroup.add(liquidLayer(1.42, 2.24, rAt(1.42), rAt(2.24), 0x7ba23a,
+    { roughness: 0.5, sheen: 0.2, sheenColor: 0xcfe08a }));
 
   // matcha surface (glossy meniscus)
   const surface = new THREE.Mesh(
     new THREE.CircleGeometry(rAt(2.24) * 0.995, 96),
-    new THREE.MeshPhysicalMaterial({ color: 0x8aa84e, roughness: 0.18, clearcoat: 0.9, clearcoatRoughness: 0.25, envMapIntensity: 1.0 })
+    new THREE.MeshPhysicalMaterial({ color: 0x6f9530, roughness: 0.22, clearcoat: 0.9, clearcoatRoughness: 0.25, envMapIntensity: 0.6 })
   );
   surface.rotation.x = -Math.PI / 2;
   surface.position.y = 2.245;
@@ -400,7 +400,7 @@
     envMapIntensity: 1.5,
     transparent: true,
   });
-  const DROPS = 320;
+  const DROPS = 230;
   const dropGeo = new THREE.SphereGeometry(1, 12, 10);
   const drops = new THREE.InstancedMesh(dropGeo, dropMat, DROPS);
   drops.renderOrder = 3;
