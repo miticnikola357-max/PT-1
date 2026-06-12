@@ -34,6 +34,17 @@
   #snap:hover { background: #dcecae; transform: translateY(-1px); }
   #snap:active { transform: translateY(0); }
   #snap:disabled { opacity: .6; cursor: default; }
+  #rec {
+    position: fixed; right: 18px; bottom: 58px;
+    font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #1a1410; background: #e6c79a; border: none; border-radius: 999px;
+    padding: 10px 18px; cursor: pointer; letter-spacing: .02em;
+    box-shadow: 0 6px 18px rgba(0,0,0,.35); transition: transform .12s ease, background .2s ease;
+    z-index: 11;
+  }
+  #rec:hover { background: #efd8b4; transform: translateY(-1px); }
+  #rec:active { transform: translateY(0); }
+  #rec:disabled { opacity: .6; cursor: default; }
 </style>
 </head>
 <body>
@@ -41,6 +52,7 @@
   <div class="hud"><b>Strawberry Matcha Latte</b> &nbsp;<span>drag to orbit · scroll to zoom</span></div>
   <div id="loader">preparing the scene…</div>
   <button id="snap" title="Render a high-resolution PNG">📸 Save photo</button>
+  <button id="rec" title="Record a 360° turntable video">🎞 Record spin</button>
 
   <script type="importmap">
   {
@@ -468,11 +480,83 @@
     snapBtn.disabled = false;
   });
 
+  // ---------- 360° turntable video recording ----------
+  const recBtn = document.getElementById('rec');
+  let recording = false;
+
+  function pickMime() {
+    const candidates = [
+      'video/mp4;codecs=avc1.42E01E',
+      'video/mp4',
+      'video/webm;codecs=vp9',
+      'video/webm;codecs=vp8',
+      'video/webm',
+    ];
+    for (const c of candidates) {
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported(c)) return c;
+    }
+    return '';
+  }
+
+  recBtn.addEventListener('click', () => {
+    if (recording) return;
+    if (!renderer.domElement.captureStream || !window.MediaRecorder) {
+      alert('Video recording is not supported in this browser. Try Chrome or Edge.');
+      return;
+    }
+    recording = true;
+    recBtn.disabled = true;
+    snapBtn.disabled = true;
+    const label = recBtn.textContent;
+
+    const seconds = 8;
+    const mime = pickMime();
+    const ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm';
+    const stream = renderer.domElement.captureStream(60);
+    const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 16_000_000 } : undefined);
+    const chunks = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = () => {
+      const blob = new Blob(chunks, { type: mime || 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `strawberry-matcha-turntable.${ext}`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      recording = false;
+      recBtn.disabled = false;
+      snapBtn.disabled = false;
+      recBtn.textContent = label;
+      controls.autoRotate = true;
+    };
+
+    // orbit the camera one full revolution around the target
+    controls.autoRotate = false;
+    const sph = new THREE.Spherical().setFromVector3(
+      camera.position.clone().sub(controls.target)
+    );
+    const startTheta = sph.theta;
+    const t0 = performance.now();
+    rec.start();
+
+    function spin() {
+      const frac = (performance.now() - t0) / 1000 / seconds;
+      sph.theta = startTheta + Math.min(frac, 1) * Math.PI * 2;
+      camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(sph));
+      camera.lookAt(controls.target);
+      recBtn.textContent = `Recording ${Math.ceil(seconds * (1 - Math.min(frac, 1)))}s…`;
+      if (frac < 1) requestAnimationFrame(spin);
+      else rec.stop();
+    }
+    spin();
+  });
+
   // ---------- Loop ----------
   let started = false;
   function animate() {
     requestAnimationFrame(animate);
-    controls.update();
+    if (!recording) controls.update();
     renderer.render(scene, camera);
     if (!started) {
       started = true;
