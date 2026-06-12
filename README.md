@@ -22,7 +22,11 @@ physically-based materials.
 
 ## Run it
 
-No build step. Just serve the folder and open it:
+**Easiest — just open it in Chrome:** double-click **`strawberry-matcha-latte.html`**.
+It's a single self-contained file (Three.js bundled in), so it works straight from
+`file://` with no server.
+
+Or serve the source version (`index.html`, which loads from `vendor/`):
 
 ```bash
 # any static server works
@@ -30,8 +34,12 @@ python3 -m http.server 8000
 # then open http://localhost:8000
 ```
 
-(Opening `index.html` directly also works in most browsers, but a local server
-avoids module/CORS quirks.)
+To rebuild the standalone file after editing `index.html`:
+
+```bash
+npm install esbuild
+node build-standalone.mjs
+```
 
 **Controls:** drag to orbit · scroll to zoom. The scene auto-rotates.
 
