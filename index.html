@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Strawberry Matcha Latte — Hyper-Realistic 3D</title>
+<style>
+  :root { color-scheme: dark; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0d0d10; }
+  #app { width: 100vw; height: 100vh; display: block; }
+  .hud {
+    position: fixed; left: 18px; bottom: 16px;
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #e8e8ea; text-shadow: 0 1px 2px rgba(0,0,0,.6);
+    pointer-events: none; user-select: none;
+  }
+  .hud b { font-weight: 600; }
+  .hud span { opacity: .7; }
+  #loader {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    font: 14px -apple-system, sans-serif; color: #cfcfd4; letter-spacing: .04em;
+    background: #0d0d10; transition: opacity .6s ease; z-index: 10;
+  }
+  #loader.hidden { opacity: 0; pointer-events: none; }
+  #snap {
+    position: fixed; right: 18px; bottom: 16px;
+    font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #11140f; background: #cfe39a; border: none; border-radius: 999px;
+    padding: 10px 18px; cursor: pointer; letter-spacing: .02em;
+    box-shadow: 0 6px 18px rgba(0,0,0,.35); transition: transform .12s ease, background .2s ease;
+    z-index: 11;
+  }
+  #snap:hover { background: #dcecae; transform: translateY(-1px); }
+  #snap:active { transform: translateY(0); }
+  #snap:disabled { opacity: .6; cursor: default; }
+  #rec {
+    position: fixed; right: 18px; bottom: 58px;
+    font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #1a1410; background: #e6c79a; border: none; border-radius: 999px;
+    padding: 10px 18px; cursor: pointer; letter-spacing: .02em;
+    box-shadow: 0 6px 18px rgba(0,0,0,.35); transition: transform .12s ease, background .2s ease;
+    z-index: 11;
+  }
+  #rec:hover { background: #efd8b4; transform: translateY(-1px); }
+  #rec:active { transform: translateY(0); }
+  #rec:disabled { opacity: .6; cursor: default; }
+  #dur {
+    position: fixed; right: 18px; bottom: 100px;
+    font: 600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #e8e8ea; background: rgba(20,20,26,.85); border: 1px solid rgba(255,255,255,.14);
+    border-radius: 999px; padding: 7px 12px; cursor: pointer; z-index: 11;
+    box-shadow: 0 6px 18px rgba(0,0,0,.35);
+  }
+  #dur:disabled { opacity: .6; cursor: default; }
+</style>
+</head>
+<body>
+  <canvas id="app"></canvas>
+  <div class="hud"><b>Strawberry Matcha Latte</b> &nbsp;<span>drag to orbit · scroll to zoom</span></div>
+  <div id="loader">preparing the scene…</div>
+  <button id="snap" title="Render a high-resolution PNG">📸 Save photo</button>
+  <button id="rec" title="Record a 360° turntable video">🎞 Record spin</button>
+  <select id="dur" title="Turntable spin length (seamless loop)">
+    <option value="4">4s spin</option>
+    <option value="6">6s spin</option>
+    <option value="8" selected>8s spin</option>
+    <option value="12">12s spin</option>
+    <option value="16">16s spin</option>
+  </select>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three.module.js",
+      "three/addons/": "./vendor/addons/"
+    }
+  }
+  </script>
+
+  <script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+  import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+  // ---------- Renderer ----------
+  const canvas = document.getElementById('app');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.98;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  // ---------- Scene & Camera ----------
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x101015);
+
+  const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.05, 100);
+  camera.position.set(3.6, 2.6, 5.2);
+
+  const controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.06;
+  controls.minDistance = 3;
+  controls.maxDistance = 12;
+  controls.maxPolarAngle = Math.PI * 0.52;
+  controls.target.set(0, 1.05, 0);
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 0.6;
+
+  // ---------- Environment (reflections / refraction) ----------
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environment = envTex;
+
+  // ---------- Lighting ----------
+  const key = new THREE.DirectionalLight(0xfff3e2, 3.2);
+  key.position.set(4, 7, 4);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.camera.near = 1;
+  key.shadow.camera.far = 30;
+  key.shadow.camera.left = -6; key.shadow.camera.right = 6;
+  key.shadow.camera.top = 6; key.shadow.camera.bottom = -6;
+  key.shadow.bias = -0.0004;
+  key.shadow.radius = 6;
+  scene.add(key);
+
+  const rim = new THREE.DirectionalLight(0xbfe0ff, 1.4);
+  rim.position.set(-5, 4, -3);
+  scene.add(rim);
+
+  const fill = new THREE.AmbientLight(0xffffff, 0.25);
+  scene.add(fill);
+
+  // ---------- Marble table ----------
+  function makeMarbleTexture() {
+    const s = 1024;
+    const c = document.createElement('canvas'); c.width = c.height = s;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#efeae2'; ctx.fillRect(0, 0, s, s);
+    // warm wash
+    const g = ctx.createRadialGradient(s*0.4, s*0.35, 80, s*0.5, s*0.5, s*0.8);
+    g.addColorStop(0, 'rgba(255,250,240,0.9)');
+    g.addColorStop(1, 'rgba(225,216,200,0.9)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+    // veins
+    function vein(x, y, len, w, shade) {
+      ctx.strokeStyle = shade; ctx.lineWidth = w; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x, y);
+      let cx = x, cy = y;
+      for (let i = 0; i < len; i++) {
+        cx += (Math.random() - 0.5) * 26;
+        cy += (Math.random() - 0.5) * 26 + 6;
+        ctx.lineTo(cx, cy);
+      }
+      ctx.stroke();
+    }
+    for (let i = 0; i < 22; i++) vein(Math.random()*s, Math.random()*s, 18, Math.random()*1.6+0.3, 'rgba(150,140,125,0.18)');
+    for (let i = 0; i < 8; i++) vein(Math.random()*s, Math.random()*s, 24, Math.random()*0.8+0.2, 'rgba(110,100,88,0.22)');
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1.4, 1.4);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+  const marbleTex = makeMarbleTexture();
+  const table = new THREE.Mesh(
+    new THREE.CircleGeometry(14, 96),
+    new THREE.MeshStandardMaterial({ map: marbleTex, roughness: 0.35, metalness: 0.0, envMapIntensity: 0.8 })
+  );
+  table.rotation.x = -Math.PI / 2;
+  table.position.y = 0;
+  table.receiveShadow = true;
+  scene.add(table);
+
+  // ---------- Silver coaster ----------
+  const silver = new THREE.MeshStandardMaterial({ color: 0xcfd2d6, roughness: 0.18, metalness: 1.0, envMapIntensity: 1.2 });
+  const coaster = new THREE.Group();
+  const plate = new THREE.Mesh(new THREE.CylinderGeometry(1.55, 1.55, 0.05, 96), silver);
+  plate.position.y = 0.025; plate.castShadow = true; plate.receiveShadow = true;
+  coaster.add(plate);
+  const rimRing = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.06, 24, 96), silver);
+  rimRing.rotation.x = Math.PI / 2; rimRing.position.y = 0.06;
+  coaster.add(rimRing);
+  scene.add(coaster);
+
+  // ---------- Liquid layers (built first, glass wraps around) ----------
+  const innerR = 0.86;          // inner radius of liquid column
+  const baseY = 0.20;           // top of glass base (floor of liquid)
+  const drinkGroup = new THREE.Group();
+  scene.add(drinkGroup);
+
+  function liquidLayer(yBottom, yTop, rBottom, rTop, color, opts = {}) {
+    const h = yTop - yBottom;
+    const geo = new THREE.CylinderGeometry(rTop, rBottom, h, 96, 1, false);
+    const mat = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(color),
+      roughness: opts.roughness ?? 0.35,
+      metalness: 0.0,
+      transmission: opts.transmission ?? 0.0,
+      thickness: opts.thickness ?? 1.0,
+      ior: 1.34,
+      clearcoat: opts.clearcoat ?? 0.0,
+      sheen: opts.sheen ?? 0.0,
+      sheenColor: new THREE.Color(opts.sheenColor ?? 0xffffff),
+      envMapIntensity: opts.envMapIntensity ?? 0.4,
+      attenuationColor: new THREE.Color(opts.attenuationColor ?? color),
+      attenuationDistance: opts.attenuationDistance ?? 0.6,
+    });
+    const m = new THREE.Mesh(geo, mat);
+    m.position.y = yBottom + h / 2;
+    return m;
+  }
+
+  // taper roughly follows the tumbler (slightly wider at top)
+  const rB = innerR * 0.92, rT = innerR;
+  function rAt(y) { // linear radius along height for liquid column
+    const t = (y - baseY) / (2.3 - baseY);
+    return THREE.MathUtils.lerp(rB, rT, THREE.MathUtils.clamp(t, 0, 1));
+  }
+
+  // bottom: strawberry purée (deep, saturated red)
+  drinkGroup.add(liquidLayer(baseY, 0.62, rAt(baseY), rAt(0.62), 0x8e1410,
+    { roughness: 0.3, transmission: 0.12, thickness: 0.8, attenuationColor: 0x5e0a08, attenuationDistance: 0.35 }));
+  // thin blend band
+  drinkGroup.add(liquidLayer(0.62, 0.72, rAt(0.62), rAt(0.72), 0xc66a55, { roughness: 0.45 }));
+  // middle: milk / yoghurt (creamy white)
+  drinkGroup.add(liquidLayer(0.72, 1.30, rAt(0.72), rAt(1.30), 0xf1e7d4,
+    { roughness: 0.55, sheen: 0.3, sheenColor: 0xfff2e2 }));
+  // blend band milk->matcha
+  drinkGroup.add(liquidLayer(1.30, 1.42, rAt(1.30), rAt(1.42), 0xc2cf94, { roughness: 0.5 }));
+  // top: matcha (vivid green) — the large portion
+  drinkGroup.add(liquidLayer(1.42, 2.24, rAt(1.42), rAt(2.24), 0x7ba23a,
+    { roughness: 0.5, sheen: 0.2, sheenColor: 0xcfe08a }));
+
+  // matcha surface (glossy meniscus)
+  const surface = new THREE.Mesh(
+    new THREE.CircleGeometry(rAt(2.24) * 0.995, 96),
+    new THREE.MeshPhysicalMaterial({ color: 0x6f9530, roughness: 0.22, clearcoat: 0.9, clearcoatRoughness: 0.25, envMapIntensity: 0.6 })
+  );
+  surface.rotation.x = -Math.PI / 2;
+  surface.position.y = 2.245;
+  drinkGroup.add(surface);
+
+  // ---------- Strawberry slices ----------
+  function strawberrySlice(radius, thick) {
+    const g = new THREE.Group();
+    const flesh = new THREE.MeshPhysicalMaterial({ color: 0xe14b3b, roughness: 0.42, clearcoat: 0.5, clearcoatRoughness: 0.4, sheen: 0.3, sheenColor: 0xff8a6b });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius * 0.96, thick, 48), flesh);
+    g.add(body);
+    // pale core
+    const core = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.45, radius * 0.45, thick * 1.02, 32),
+      new THREE.MeshStandardMaterial({ color: 0xf7d9cf, roughness: 0.6 }));
+    g.add(core);
+    // seeds
+    const seedMat = new THREE.MeshStandardMaterial({ color: 0xe8d27a, roughness: 0.5 });
+    for (let ring = 0; ring < 2; ring++) {
+      const rr = radius * (0.6 + ring * 0.22);
+      const n = 10 + ring * 4;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + ring;
+        const s = new THREE.Mesh(new THREE.SphereGeometry(radius * 0.04, 8, 6), seedMat);
+        s.scale.set(1, 1, 1.8);
+        s.position.set(Math.cos(a) * rr, thick * 0.5, Math.sin(a) * rr);
+        g.add(s);
+      }
+    }
+    return g;
+  }
+
+  // a slice resting against the glass wall, partly in the matcha (like the photo)
+  const slice1 = strawberrySlice(0.34, 0.10);
+  slice1.position.set(0.18, 1.95, 0.42);
+  slice1.rotation.set(Math.PI * 0.46, 0.2, 0.1);
+  drinkGroup.add(slice1);
+
+  // a slice floating flat-ish on the surface
+  const slice2 = strawberrySlice(0.30, 0.09);
+  slice2.position.set(-0.30, 2.16, -0.18);
+  slice2.rotation.set(Math.PI * 0.5 - 0.25, 0.6, 0.0);
+  drinkGroup.add(slice2);
+
+  // a whole small strawberry tucked at the rim
+  const berry = new THREE.Group();
+  const berryBody = new THREE.Mesh(
+    new THREE.SphereGeometry(0.26, 32, 24),
+    new THREE.MeshPhysicalMaterial({ color: 0xcf2f24, roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.35 })
+  );
+  berryBody.scale.set(1, 1.25, 1);
+  berry.add(berryBody);
+  berry.position.set(0.34, 2.18, 0.18);
+  berry.rotation.z = 0.3;
+  drinkGroup.add(berry);
+
+  // ---------- The glass (lathe profile, refractive) ----------
+  // profile points (x = radius, y = height) tracing a thick-based tumbler
+  const oB = 0.96, oT = 1.06, wall = 0.07, H = 2.36, base = 0.20;
+  const pts = [
+    new THREE.Vector2(0.0, 0.0),
+    new THREE.Vector2(oB, 0.0),
+    new THREE.Vector2(oB, 0.02),
+    new THREE.Vector2(oT, H),                 // outer rim
+    new THREE.Vector2(oT - wall, H),          // inner rim
+    new THREE.Vector2(oB - wall, base),       // inner wall down to base
+    new THREE.Vector2(0.0, base),             // inner base
+  ];
+  const glassGeo = new THREE.LatheGeometry(pts, 128);
+  glassGeo.computeVertexNormals();
+  const glassMat = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff,
+    metalness: 0.0,
+    roughness: 0.02,
+    transmission: 1.0,
+    thickness: 0.5,
+    ior: 1.5,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.02,
+    envMapIntensity: 1.4,
+    transparent: true,
+    side: THREE.DoubleSide,
+    specularIntensity: 1.0,
+  });
+  const glass = new THREE.Mesh(glassGeo, glassMat);
+  glass.castShadow = true;
+  glass.renderOrder = 2;
+  drinkGroup.add(glass);
+
+  // condensation-free subtle outer highlight ring at rim
+  const rimGlass = new THREE.Mesh(
+    new THREE.TorusGeometry(oT - wall * 0.5, wall * 0.5, 20, 128),
+    glassMat
+  );
+  rimGlass.rotation.x = Math.PI / 2;
+  rimGlass.position.y = H;
+  drinkGroup.add(rimGlass);
+
+  // ---------- Straw ----------
+  const strawMat = new THREE.MeshStandardMaterial({ color: 0xeeeef2, roughness: 0.25, metalness: 0.6, envMapIntensity: 1.1 });
+  const straw = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 3.0, 32), strawMat);
+  straw.position.set(-0.35, 2.0, 0.2);
+  straw.rotation.set(0.32, 0, 0.22);
+  straw.castShadow = true;
+  drinkGroup.add(straw);
+
+  // ---------- Ice cubes (floating in the matcha) ----------
+  const iceMat = new THREE.MeshPhysicalMaterial({
+    color: 0xeaf2f5,
+    roughness: 0.12,
+    metalness: 0.0,
+    transmission: 1.0,
+    thickness: 0.6,
+    ior: 1.31,
+    clearcoat: 0.6,
+    clearcoatRoughness: 0.15,
+    envMapIntensity: 1.2,
+    transparent: true,
+    attenuationColor: new THREE.Color(0xdfeef0),
+    attenuationDistance: 1.2,
+  });
+  function iceCube(size) {
+    const geo = new RoundedBoxGeometry(size, size, size, 4, size * 0.18);
+    const m = new THREE.Mesh(geo, iceMat);
+    m.castShadow = true;
+    m.renderOrder = 1;
+    return m;
+  }
+  const icePlacements = [
+    { p: [0.10, 2.05, -0.10], s: 0.42 },
+    { p: [-0.34, 1.92, 0.22], s: 0.36 },
+    { p: [0.40, 1.86, 0.14], s: 0.32 },
+    { p: [-0.05, 1.70, -0.34], s: 0.30 },
+  ];
+  for (const ic of icePlacements) {
+    const cube = iceCube(ic.s);
+    cube.position.set(...ic.p);
+    cube.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    drinkGroup.add(cube);
+  }
+
+  // ---------- Condensation droplets on the outer glass wall ----------
+  // outer wall radius at a given height (matches the lathe profile)
+  function wallRadiusAt(y) {
+    const t = THREE.MathUtils.clamp((y - 0.02) / (H - 0.02), 0, 1);
+    return THREE.MathUtils.lerp(oB, oT, t);
+  }
+  const dropMat = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff,
+    roughness: 0.03,
+    metalness: 0.0,
+    transmission: 1.0,
+    thickness: 0.05,
+    ior: 1.333,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.02,
+    envMapIntensity: 1.5,
+    transparent: true,
+  });
+  const DROPS = 230;
+  const dropGeo = new THREE.SphereGeometry(1, 12, 10);
+  const drops = new THREE.InstancedMesh(dropGeo, dropMat, DROPS);
+  drops.renderOrder = 3;
+  const _m = new THREE.Matrix4();
+  const _q = new THREE.Quaternion();
+  const _pos = new THREE.Vector3();
+  const _scl = new THREE.Vector3();
+  const _basis = new THREE.Matrix4();
+  const _nrm = new THREE.Vector3();
+  const _up = new THREE.Vector3(0, 1, 0);
+  const _tan = new THREE.Vector3();
+  const _bi = new THREE.Vector3();
+  for (let i = 0; i < DROPS; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const y = THREE.MathUtils.lerp(0.16, H - 0.06, Math.pow(Math.random(), 0.9));
+    const wr = wallRadiusAt(y);
+    const base = 0.012 + Math.random() * 0.05;          // bead radius
+    const elong = Math.random() < 0.18 ? (1.6 + Math.random() * 2.4) : (1 + Math.random() * 0.3); // some drips
+    // outward radial normal
+    _nrm.set(Math.cos(a), 0, Math.sin(a)).normalize();
+    _tan.crossVectors(_up, _nrm).normalize();
+    _bi.crossVectors(_nrm, _tan).normalize();           // ~vertical
+    _basis.makeBasis(_nrm, _bi, _tan);
+    _q.setFromRotationMatrix(_basis);
+    // sit slightly proud of the wall so the bead pokes outward
+    _pos.set(Math.cos(a) * (wr + base * 0.35), y, Math.sin(a) * (wr + base * 0.35));
+    // thin along the normal (x), tall along vertical (y) for drips, round in tangent (z)
+    _scl.set(base * 0.55, base * elong, base);
+    _m.compose(_pos, _q, _scl);
+    drops.setMatrixAt(i, _m);
+  }
+  drops.instanceMatrix.needsUpdate = true;
+  drinkGroup.add(drops);
+
+  // ---------- Contact shadow softener under glass ----------
+  const contact = new THREE.Mesh(
+    new THREE.CircleGeometry(1.15, 64),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.18 })
+  );
+  contact.rotation.x = -Math.PI / 2;
+  contact.position.y = 0.052;
+  coaster.add(contact);
+
+  // ---------- Resize ----------
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  });
+
+  // ---------- High-resolution snapshot ----------
+  const snapBtn = document.getElementById('snap');
+  snapBtn.addEventListener('click', () => {
+    snapBtn.disabled = true;
+    const label = snapBtn.textContent;
+    snapBtn.textContent = 'Rendering…';
+
+    // target a crisp 3:2 export, capped for memory safety
+    const longEdge = 3000;
+    const aspect = window.innerWidth / window.innerHeight;
+    const outW = aspect >= 1 ? longEdge : Math.round(longEdge * aspect);
+    const outH = aspect >= 1 ? Math.round(longEdge / aspect) : longEdge;
+
+    const prevPR = renderer.getPixelRatio();
+    const prevSize = new THREE.Vector2();
+    renderer.getSize(prevSize);
+    const prevAutoRotate = controls.autoRotate;
+    controls.autoRotate = false;
+
+    renderer.setPixelRatio(1);
+    renderer.setSize(outW, outH, false);
+    camera.aspect = outW / outH;
+    camera.updateProjectionMatrix();
+    renderer.render(scene, camera);
+
+    const url = renderer.domElement.toDataURL('image/png');
+
+    // restore live view
+    renderer.setPixelRatio(prevPR);
+    renderer.setSize(prevSize.x, prevSize.y, false);
+    camera.aspect = prevSize.x / prevSize.y;
+    camera.updateProjectionMatrix();
+    controls.autoRotate = prevAutoRotate;
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `strawberry-matcha-${outW}x${outH}.png`;
+    a.click();
+
+    snapBtn.textContent = label;
+    snapBtn.disabled = false;
+  });
+
+  // ---------- 360° turntable video recording ----------
+  const recBtn = document.getElementById('rec');
+  const durSel = document.getElementById('dur');
+  let recording = false;
+
+  function pickMime() {
+    const candidates = [
+      'video/mp4;codecs=avc1.42E01E',
+      'video/mp4',
+      'video/webm;codecs=vp9',
+      'video/webm;codecs=vp8',
+      'video/webm',
+    ];
+    for (const c of candidates) {
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported(c)) return c;
+    }
+    return '';
+  }
+
+  recBtn.addEventListener('click', () => {
+    if (recording) return;
+    if (!renderer.domElement.captureStream || !window.MediaRecorder) {
+      alert('Video recording is not supported in this browser. Try Chrome or Edge.');
+      return;
+    }
+    recording = true;
+    recBtn.disabled = true;
+    snapBtn.disabled = true;
+    durSel.disabled = true;
+    const label = recBtn.textContent;
+
+    const seconds = parseFloat(durSel.value) || 8;
+    const mime = pickMime();
+    const ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm';
+    const stream = renderer.domElement.captureStream(60);
+    const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 16_000_000 } : undefined);
+    const chunks = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = () => {
+      const blob = new Blob(chunks, { type: mime || 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `strawberry-matcha-turntable.${ext}`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      recording = false;
+      recBtn.disabled = false;
+      snapBtn.disabled = false;
+      durSel.disabled = false;
+      recBtn.textContent = label;
+      controls.autoRotate = true;
+    };
+
+    // orbit the camera one full revolution around the target
+    controls.autoRotate = false;
+    const sph = new THREE.Spherical().setFromVector3(
+      camera.position.clone().sub(controls.target)
+    );
+    const startTheta = sph.theta;
+    const t0 = performance.now();
+    rec.start();
+
+    function spin() {
+      const frac = (performance.now() - t0) / 1000 / seconds;
+      // Stop *before* drawing the full-revolution frame: theta=2π equals the
+      // start frame, so omitting it keeps the looped video seamless.
+      if (frac >= 1) { rec.stop(); return; }
+      sph.theta = startTheta + frac * Math.PI * 2;
+      camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(sph));
+      camera.lookAt(controls.target);
+      recBtn.textContent = `Recording ${Math.ceil(seconds * (1 - frac))}s…`;
+      requestAnimationFrame(spin);
+    }
+    spin();
+  });
+
+  // ---------- Loop ----------
+  let started = false;
+  function animate() {
+    requestAnimationFrame(animate);
+    if (!recording) controls.update();
+    renderer.render(scene, camera);
+    if (!started) {
+      started = true;
+      document.getElementById('loader').classList.add('hidden');
+    }
+  }
+  animate();
+  </script>
+</body>
+</html>
