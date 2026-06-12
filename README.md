@@ -12,6 +12,9 @@ physically-based materials.
   large matcha layer (top), with soft blend bands and a glossy meniscus.
 - **Garnish** — strawberry slices (flesh, pale core, seeds), a whole berry at
   the rim, and a metallic straw.
+- **Ice cubes** — refractive rounded cubes floating in the matcha layer.
+- **Condensation** — ~320 instanced water droplets clinging to the outer glass,
+  with occasional elongated drips for a freshly-poured, chilled look.
 - **Setting** — a procedural marble table and a polished silver coaster.
 - **Lighting** — image-based environment lighting (`RoomEnvironment`) for real
   reflections/refraction, plus a warm key light with soft shadows and ACES
@@ -31,5 +34,8 @@ python3 -m http.server 8000
 avoids module/CORS quirks.)
 
 **Controls:** drag to orbit · scroll to zoom. The scene auto-rotates.
+
+**Save photo:** click **📸 Save photo** (bottom-right) to render a crisp
+~3000px PNG of the current view and download it.
 
 [Three.js]: https://threejs.org

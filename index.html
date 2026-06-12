@@ -23,12 +23,24 @@
     background: #0d0d10; transition: opacity .6s ease; z-index: 10;
   }
   #loader.hidden { opacity: 0; pointer-events: none; }
+  #snap {
+    position: fixed; right: 18px; bottom: 16px;
+    font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #11140f; background: #cfe39a; border: none; border-radius: 999px;
+    padding: 10px 18px; cursor: pointer; letter-spacing: .02em;
+    box-shadow: 0 6px 18px rgba(0,0,0,.35); transition: transform .12s ease, background .2s ease;
+    z-index: 11;
+  }
+  #snap:hover { background: #dcecae; transform: translateY(-1px); }
+  #snap:active { transform: translateY(0); }
+  #snap:disabled { opacity: .6; cursor: default; }
 </style>
 </head>
 <body>
   <canvas id="app"></canvas>
   <div class="hud"><b>Strawberry Matcha Latte</b> &nbsp;<span>drag to orbit · scroll to zoom</span></div>
   <div id="loader">preparing the scene…</div>
+  <button id="snap" title="Render a high-resolution PNG">📸 Save photo</button>
 
   <script type="importmap">
   {
@@ -43,11 +55,11 @@
   import * as THREE from 'three';
   import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
   import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-  import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+  import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
   // ---------- Renderer ----------
   const canvas = document.getElementById('app');
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -308,6 +320,94 @@
   straw.castShadow = true;
   drinkGroup.add(straw);
 
+  // ---------- Ice cubes (floating in the matcha) ----------
+  const iceMat = new THREE.MeshPhysicalMaterial({
+    color: 0xeaf2f5,
+    roughness: 0.12,
+    metalness: 0.0,
+    transmission: 1.0,
+    thickness: 0.6,
+    ior: 1.31,
+    clearcoat: 0.6,
+    clearcoatRoughness: 0.15,
+    envMapIntensity: 1.2,
+    transparent: true,
+    attenuationColor: new THREE.Color(0xdfeef0),
+    attenuationDistance: 1.2,
+  });
+  function iceCube(size) {
+    const geo = new RoundedBoxGeometry(size, size, size, 4, size * 0.18);
+    const m = new THREE.Mesh(geo, iceMat);
+    m.castShadow = true;
+    m.renderOrder = 1;
+    return m;
+  }
+  const icePlacements = [
+    { p: [0.10, 2.05, -0.10], s: 0.42 },
+    { p: [-0.34, 1.92, 0.22], s: 0.36 },
+    { p: [0.40, 1.86, 0.14], s: 0.32 },
+    { p: [-0.05, 1.70, -0.34], s: 0.30 },
+  ];
+  for (const ic of icePlacements) {
+    const cube = iceCube(ic.s);
+    cube.position.set(...ic.p);
+    cube.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    drinkGroup.add(cube);
+  }
+
+  // ---------- Condensation droplets on the outer glass wall ----------
+  // outer wall radius at a given height (matches the lathe profile)
+  function wallRadiusAt(y) {
+    const t = THREE.MathUtils.clamp((y - 0.02) / (H - 0.02), 0, 1);
+    return THREE.MathUtils.lerp(oB, oT, t);
+  }
+  const dropMat = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff,
+    roughness: 0.03,
+    metalness: 0.0,
+    transmission: 1.0,
+    thickness: 0.05,
+    ior: 1.333,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.02,
+    envMapIntensity: 1.5,
+    transparent: true,
+  });
+  const DROPS = 320;
+  const dropGeo = new THREE.SphereGeometry(1, 12, 10);
+  const drops = new THREE.InstancedMesh(dropGeo, dropMat, DROPS);
+  drops.renderOrder = 3;
+  const _m = new THREE.Matrix4();
+  const _q = new THREE.Quaternion();
+  const _pos = new THREE.Vector3();
+  const _scl = new THREE.Vector3();
+  const _basis = new THREE.Matrix4();
+  const _nrm = new THREE.Vector3();
+  const _up = new THREE.Vector3(0, 1, 0);
+  const _tan = new THREE.Vector3();
+  const _bi = new THREE.Vector3();
+  for (let i = 0; i < DROPS; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const y = THREE.MathUtils.lerp(0.16, H - 0.06, Math.pow(Math.random(), 0.9));
+    const wr = wallRadiusAt(y);
+    const base = 0.012 + Math.random() * 0.05;          // bead radius
+    const elong = Math.random() < 0.18 ? (1.6 + Math.random() * 2.4) : (1 + Math.random() * 0.3); // some drips
+    // outward radial normal
+    _nrm.set(Math.cos(a), 0, Math.sin(a)).normalize();
+    _tan.crossVectors(_up, _nrm).normalize();
+    _bi.crossVectors(_nrm, _tan).normalize();           // ~vertical
+    _basis.makeBasis(_nrm, _bi, _tan);
+    _q.setFromRotationMatrix(_basis);
+    // sit slightly proud of the wall so the bead pokes outward
+    _pos.set(Math.cos(a) * (wr + base * 0.35), y, Math.sin(a) * (wr + base * 0.35));
+    // thin along the normal (x), tall along vertical (y) for drips, round in tangent (z)
+    _scl.set(base * 0.55, base * elong, base);
+    _m.compose(_pos, _q, _scl);
+    drops.setMatrixAt(i, _m);
+  }
+  drops.instanceMatrix.needsUpdate = true;
+  drinkGroup.add(drops);
+
   // ---------- Contact shadow softener under glass ----------
   const contact = new THREE.Mesh(
     new THREE.CircleGeometry(1.15, 64),
@@ -323,6 +423,49 @@
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  });
+
+  // ---------- High-resolution snapshot ----------
+  const snapBtn = document.getElementById('snap');
+  snapBtn.addEventListener('click', () => {
+    snapBtn.disabled = true;
+    const label = snapBtn.textContent;
+    snapBtn.textContent = 'Rendering…';
+
+    // target a crisp 3:2 export, capped for memory safety
+    const longEdge = 3000;
+    const aspect = window.innerWidth / window.innerHeight;
+    const outW = aspect >= 1 ? longEdge : Math.round(longEdge * aspect);
+    const outH = aspect >= 1 ? Math.round(longEdge / aspect) : longEdge;
+
+    const prevPR = renderer.getPixelRatio();
+    const prevSize = new THREE.Vector2();
+    renderer.getSize(prevSize);
+    const prevAutoRotate = controls.autoRotate;
+    controls.autoRotate = false;
+
+    renderer.setPixelRatio(1);
+    renderer.setSize(outW, outH, false);
+    camera.aspect = outW / outH;
+    camera.updateProjectionMatrix();
+    renderer.render(scene, camera);
+
+    const url = renderer.domElement.toDataURL('image/png');
+
+    // restore live view
+    renderer.setPixelRatio(prevPR);
+    renderer.setSize(prevSize.x, prevSize.y, false);
+    camera.aspect = prevSize.x / prevSize.y;
+    camera.updateProjectionMatrix();
+    controls.autoRotate = prevAutoRotate;
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `strawberry-matcha-${outW}x${outH}.png`;
+    a.click();
+
+    snapBtn.textContent = label;
+    snapBtn.disabled = false;
   });
 
   // ---------- Loop ----------
