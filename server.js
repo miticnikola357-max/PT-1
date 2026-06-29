@@ -1,21 +1,41 @@
 const express = require("express");
 const path = require("path");
+const fs = require("fs");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
+
+const CONFIG_PATH = path.join(__dirname, ".spotify-cookie");
 
 let cachedToken = null;
 let tokenExpiry = 0;
 
-async function getSpotifyToken() {
+function getSavedCookie() {
+  try {
+    return fs.readFileSync(CONFIG_PATH, "utf8").trim();
+  } catch {
+    return null;
+  }
+}
+
+function saveCookie(cookie) {
+  fs.writeFileSync(CONFIG_PATH, cookie.trim());
+}
+
+async function getSpotifyToken(spDcCookie) {
   if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
+
+  const cookie = spDcCookie || getSavedCookie();
+  if (!cookie) throw new Error("NO_COOKIE");
 
   const res = await fetch(
     "https://open.spotify.com/get_access_token?reason=transport&productType=web_player",
     {
       headers: {
+        Cookie: `sp_dc=${cookie}`,
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
         Accept: "application/json",
@@ -23,9 +43,17 @@ async function getSpotifyToken() {
     }
   );
 
-  if (!res.ok) throw new Error(`Token request failed: ${res.status}`);
+  if (!res.ok) {
+    cachedToken = null;
+    tokenExpiry = 0;
+    throw new Error(`Token request failed (${res.status}). Your sp_dc cookie may be expired — get a fresh one.`);
+  }
 
   const data = await res.json();
+  if (!data.accessToken) {
+    throw new Error("No access token returned. Your sp_dc cookie may be invalid.");
+  }
+
   cachedToken = data.accessToken;
   tokenExpiry = data.accessTokenExpirationTimestampMs || Date.now() + 300_000;
   return cachedToken;
@@ -75,6 +103,22 @@ async function fetchEpisodeMetadata(episodeId, token) {
   return res.json();
 }
 
+app.get("/api/status", (req, res) => {
+  const cookie = getSavedCookie();
+  res.json({ hasCookie: !!cookie });
+});
+
+app.post("/api/cookie", (req, res) => {
+  const { cookie } = req.body;
+  if (!cookie || cookie.trim().length < 10) {
+    return res.status(400).json({ error: "Invalid cookie value" });
+  }
+  saveCookie(cookie);
+  cachedToken = null;
+  tokenExpiry = 0;
+  res.json({ ok: true });
+});
+
 app.get("/api/transcript/:episodeId", async (req, res) => {
   try {
     const episodeId = parseEpisodeId(req.params.episodeId);
@@ -82,7 +126,16 @@ app.get("/api/transcript/:episodeId", async (req, res) => {
       return res.status(400).json({ error: "Invalid episode ID or URL" });
     }
 
-    const token = await getSpotifyToken();
+    let token;
+    try {
+      token = await getSpotifyToken();
+    } catch (err) {
+      if (err.message === "NO_COOKIE") {
+        return res.status(401).json({ error: "NO_COOKIE" });
+      }
+      throw err;
+    }
+
     const [transcript, metadata] = await Promise.all([
       fetchTranscript(episodeId, token),
       fetchEpisodeMetadata(episodeId, token),
@@ -90,7 +143,7 @@ app.get("/api/transcript/:episodeId", async (req, res) => {
 
     if (!transcript) {
       return res.status(404).json({
-        error: "No transcript available for this episode",
+        error: "No transcript available for this episode. Not all episodes have transcripts on Spotify.",
       });
     }
 
@@ -114,16 +167,10 @@ app.get("/api/transcript/:episodeId", async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error("Error fetching transcript:", err.message);
+    cachedToken = null;
+    tokenExpiry = 0;
     res.status(500).json({ error: err.message });
   }
-});
-
-app.get("/api/parse-url", (req, res) => {
-  const url = req.query.url;
-  if (!url) return res.status(400).json({ error: "URL required" });
-  const id = parseEpisodeId(url);
-  if (!id) return res.status(400).json({ error: "Could not parse episode ID" });
-  res.json({ episodeId: id });
 });
 
 app.listen(PORT, () => {

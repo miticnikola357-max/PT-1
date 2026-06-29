@@ -60,6 +60,93 @@
     font-size: 0.95rem;
   }
 
+  .setup-card {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    margin-bottom: 24px;
+    display: none;
+  }
+
+  .setup-card.show { display: block; }
+
+  .setup-card h2 {
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+  }
+
+  .setup-card ol {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.8;
+    padding-left: 20px;
+    margin-bottom: 20px;
+  }
+
+  .setup-card ol li { margin-bottom: 4px; }
+
+  .setup-card code {
+    background: var(--surface-raised);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: var(--green);
+  }
+
+  .setup-card .input-row {
+    display: flex;
+    gap: 10px;
+  }
+
+  .setup-card input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    font-size: 0.9rem;
+    color: var(--text);
+    outline: none;
+    font-family: monospace;
+  }
+
+  .setup-card input:focus { border-color: var(--green); }
+
+  .connected-badge {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: rgba(29, 185, 84, 0.1);
+    border: 1px solid rgba(29, 185, 84, 0.3);
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+    font-size: 0.88rem;
+    color: var(--green);
+  }
+
+  .connected-badge.show { display: flex; }
+
+  .connected-badge .dot {
+    width: 8px;
+    height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .connected-badge button {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 0.82rem;
+    text-decoration: underline;
+  }
+
+  .connected-badge button:hover { color: var(--text-secondary); }
+
   .input-group {
     display: flex;
     gap: 10px;
@@ -101,11 +188,7 @@
   }
   .btn-primary:hover { background: var(--green-hover); transform: scale(1.02); }
   .btn-primary:active { transform: scale(0.98); }
-  .btn-primary:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-  }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
   .btn-secondary {
     background: var(--surface-raised);
@@ -121,6 +204,12 @@
     font-size: 0.85rem;
   }
   .btn-ghost:hover { color: var(--text); }
+
+  .btn-sm {
+    padding: 10px 20px;
+    font-size: 0.88rem;
+    border-radius: var(--radius);
+  }
 
   .error {
     background: rgba(255, 75, 75, 0.1);
@@ -248,21 +337,16 @@
 
   .transcript-box::-webkit-scrollbar { width: 6px; }
   .transcript-box::-webkit-scrollbar-track { background: transparent; }
-  .transcript-box::-webkit-scrollbar-thumb {
-    background: var(--border);
-    border-radius: 3px;
-  }
+  .transcript-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
   .segment {
     display: flex;
     gap: 16px;
-    padding: 8px 0;
+    padding: 8px 4px;
     border-bottom: 1px solid rgba(255,255,255,0.04);
     cursor: pointer;
     transition: background 0.1s;
     border-radius: 4px;
-    padding-left: 4px;
-    padding-right: 4px;
   }
 
   .segment:last-child { border-bottom: none; }
@@ -307,9 +391,7 @@
     pointer-events: none;
   }
 
-  .copy-toast.show {
-    transform: translateX(-50%) translateY(0);
-  }
+  .copy-toast.show { transform: translateX(-50%) translateY(0); }
 
   .empty-state {
     text-align: center;
@@ -324,6 +406,7 @@
   @media (max-width: 600px) {
     .app { padding: 16px 14px 48px; }
     .input-group { flex-direction: column; }
+    .setup-card .input-row { flex-direction: column; }
     .btn { padding: 14px 20px; justify-content: center; }
     .episode-header { flex-direction: column; align-items: center; text-align: center; }
     .episode-info h2 { white-space: normal; }
@@ -345,7 +428,28 @@
     <p>Paste a Spotify episode link to get the transcript</p>
   </header>
 
-  <div class="input-group">
+  <div class="setup-card" id="setupCard">
+    <h2>One-time setup: Connect your Spotify</h2>
+    <ol>
+      <li>Open <code>open.spotify.com</code> in your browser and log in</li>
+      <li>Press <code>F12</code> to open DevTools</li>
+      <li>Go to <strong>Application</strong> tab &rarr; <strong>Cookies</strong> &rarr; <code>https://open.spotify.com</code></li>
+      <li>Find the cookie named <code>sp_dc</code> and copy its <strong>Value</strong></li>
+      <li>Paste it below</li>
+    </ol>
+    <div class="input-row">
+      <input type="password" id="cookieInput" placeholder="Paste your sp_dc cookie value here..." />
+      <button class="btn btn-primary btn-sm" onclick="saveCookie()">Connect</button>
+    </div>
+  </div>
+
+  <div class="connected-badge" id="connectedBadge">
+    <span class="dot"></span>
+    <span>Spotify connected</span>
+    <button onclick="showSetup()">Change</button>
+  </div>
+
+  <div class="input-group" id="mainInput" style="display:none">
     <input type="text" id="urlInput" placeholder="https://open.spotify.com/episode/..." spellcheck="false" />
     <button class="btn btn-primary" id="fetchBtn" onclick="fetchTranscript()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -363,7 +467,7 @@
   </div>
 
   <div class="result" id="result">
-    <div class="episode-header" id="episodeHeader">
+    <div class="episode-header">
       <img id="episodeCover" src="" alt="Cover" />
       <div class="episode-info">
         <h2 id="episodeTitle"></h2>
@@ -373,16 +477,14 @@
     </div>
 
     <div class="transcript-controls">
-      <button class="btn btn-secondary" id="copyBtn" onclick="copyTranscript()">
+      <button class="btn btn-secondary" onclick="copyTranscript()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
           <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
         </svg>
         Copy Transcript
       </button>
 
-      <button class="btn btn-ghost" id="copyTimestampsBtn" onclick="copyWithTimestamps()">
-        Copy with Timestamps
-      </button>
+      <button class="btn btn-ghost" onclick="copyWithTimestamps()">Copy with Timestamps</button>
 
       <div class="spacer"></div>
 
@@ -411,16 +513,74 @@
   let currentView = "timed";
 
   const urlInput = document.getElementById("urlInput");
-  const fetchBtn = document.getElementById("fetchBtn");
   const errorEl = document.getElementById("error");
   const loadingEl = document.getElementById("loading");
   const resultEl = document.getElementById("result");
   const emptyStateEl = document.getElementById("emptyState");
   const transcriptBox = document.getElementById("transcriptBox");
   const toastEl = document.getElementById("toast");
+  const setupCard = document.getElementById("setupCard");
+  const connectedBadge = document.getElementById("connectedBadge");
+  const mainInput = document.getElementById("mainInput");
 
-  urlInput.addEventListener("keydown", (e) => {
+  async function checkStatus() {
+    try {
+      const res = await fetch("/api/status");
+      const data = await res.json();
+      if (data.hasCookie) {
+        showConnected();
+      } else {
+        showSetup();
+      }
+    } catch {
+      showSetup();
+    }
+  }
+
+  function showConnected() {
+    setupCard.classList.remove("show");
+    connectedBadge.classList.add("show");
+    mainInput.style.display = "flex";
+    urlInput.focus();
+  }
+
+  function showSetup() {
+    setupCard.classList.add("show");
+    connectedBadge.classList.remove("show");
+    mainInput.style.display = "none";
+    document.getElementById("cookieInput").focus();
+  }
+
+  async function saveCookie() {
+    const cookie = document.getElementById("cookieInput").value.trim();
+    if (!cookie) {
+      showError("Please paste your sp_dc cookie value");
+      return;
+    }
+    hideError();
+    try {
+      const res = await fetch("/api/cookie", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cookie }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to save cookie");
+      }
+      showToast("Spotify connected!");
+      showConnected();
+    } catch (err) {
+      showError(err.message);
+    }
+  }
+
+  urlInput?.addEventListener("keydown", (e) => {
     if (e.key === "Enter") fetchTranscript();
+  });
+
+  document.getElementById("cookieInput")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") saveCookie();
   });
 
   function formatMs(ms) {
@@ -447,9 +607,7 @@
     errorEl.classList.add("show");
   }
 
-  function hideError() {
-    errorEl.classList.remove("show");
-  }
+  function hideError() { errorEl.classList.remove("show"); }
 
   function showToast(msg) {
     toastEl.textContent = msg || "Copied to clipboard!";
@@ -473,14 +631,11 @@
 
   async function fetchTranscript() {
     const input = urlInput.value.trim();
-    if (!input) {
-      showError("Please enter a Spotify episode URL");
-      return;
-    }
+    if (!input) { showError("Please enter a Spotify episode URL"); return; }
 
     const episodeId = extractEpisodeId(input);
     if (!episodeId) {
-      showError("Could not find a valid Spotify episode ID. Please paste a URL like: https://open.spotify.com/episode/...");
+      showError("Could not find a valid Spotify episode ID. Paste a URL like: https://open.spotify.com/episode/...");
       return;
     }
 
@@ -488,15 +643,18 @@
     loadingEl.classList.add("show");
     resultEl.classList.remove("show");
     emptyStateEl.style.display = "none";
-    fetchBtn.disabled = true;
+    document.getElementById("fetchBtn").disabled = true;
 
     try {
       const res = await fetch(`/api/transcript/${episodeId}`);
       const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to fetch transcript");
+      if (res.status === 401 && data.error === "NO_COOKIE") {
+        showSetup();
+        throw new Error("Please connect your Spotify account first");
       }
+
+      if (!res.ok) throw new Error(data.error || "Failed to fetch transcript");
 
       if (!data.sections || data.sections.length === 0) {
         throw new Error("This episode does not have a transcript available on Spotify");
@@ -509,23 +667,18 @@
       emptyStateEl.style.display = "block";
     } finally {
       loadingEl.classList.remove("show");
-      fetchBtn.disabled = false;
+      document.getElementById("fetchBtn").disabled = false;
     }
   }
 
   function renderResult(data) {
-    if (data.image) {
-      document.getElementById("episodeCover").src = data.image;
-      document.getElementById("episodeCover").style.display = "block";
-    } else {
-      document.getElementById("episodeCover").style.display = "none";
-    }
+    const cover = document.getElementById("episodeCover");
+    if (data.image) { cover.src = data.image; cover.style.display = "block"; }
+    else { cover.style.display = "none"; }
 
     document.getElementById("episodeTitle").textContent = data.title || "Podcast Episode";
     document.getElementById("showName").textContent = data.show || "";
-    document.getElementById("duration").textContent = data.duration
-      ? formatDuration(data.duration)
-      : "";
+    document.getElementById("duration").textContent = data.duration ? formatDuration(data.duration) : "";
 
     renderTranscript();
     resultEl.classList.add("show");
@@ -533,27 +686,24 @@
 
   function renderTranscript() {
     if (!currentData) return;
-
     if (currentView === "timed") {
       transcriptBox.innerHTML = currentData.sections
-        .map(
-          (s) =>
-            `<div class="segment" onclick="copySegment(this)">
-              <span class="timestamp">${formatMs(s.startMs)}</span>
-              <span class="text">${escapeHtml(s.text)}</span>
-            </div>`
-        )
-        .join("");
+        .map(s =>
+          `<div class="segment" onclick="copySegment(this)">
+            <span class="timestamp">${formatMs(s.startMs)}</span>
+            <span class="text">${escapeHtml(s.text)}</span>
+          </div>`
+        ).join("");
     } else {
-      const fullText = currentData.sections.map((s) => s.text).join("\n\n");
+      const fullText = currentData.sections.map(s => s.text).join("\n\n");
       transcriptBox.innerHTML = `<div class="plain-text">${escapeHtml(fullText)}</div>`;
     }
   }
 
   function escapeHtml(str) {
-    const div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
+    const d = document.createElement("div");
+    d.textContent = str;
+    return d.innerHTML;
   }
 
   function setView(view) {
@@ -565,15 +715,13 @@
 
   function copyTranscript() {
     if (!currentData) return;
-    const text = currentData.sections.map((s) => s.text).join("\n\n");
+    const text = currentData.sections.map(s => s.text).join("\n\n");
     navigator.clipboard.writeText(text).then(() => showToast());
   }
 
   function copyWithTimestamps() {
     if (!currentData) return;
-    const text = currentData.sections
-      .map((s) => `[${formatMs(s.startMs)}] ${s.text}`)
-      .join("\n\n");
+    const text = currentData.sections.map(s => `[${formatMs(s.startMs)}] ${s.text}`).join("\n\n");
     navigator.clipboard.writeText(text).then(() => showToast("Copied with timestamps!"));
   }
 
@@ -581,6 +729,8 @@
     const text = el.querySelector(".text").textContent;
     navigator.clipboard.writeText(text).then(() => showToast("Segment copied!"));
   }
+
+  checkStatus();
 </script>
 </body>
 </html>
