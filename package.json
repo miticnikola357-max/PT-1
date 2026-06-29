@@ -1,0 +1,13 @@
+{
+  "name": "spotify-podcast-transcripts",
+  "version": "1.0.0",
+  "description": "Fetch and copy transcripts from Spotify podcast episodes",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}
