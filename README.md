@@ -1,17 +1,32 @@
-# PT-1
+# Spotify Podcast Transcripts
 
-## 💕 Memory Match
+Fetch and copy transcripts from Spotify podcast episodes.
 
-A cute little two-player memory game — flip cards, find matching pairs, and
-whoever collects the most pairs wins. Perfect for playing together.
+## Features
 
-### How to play
-1. Open `index.html` in any web browser (just double-click it).
-2. Player **💖 You** goes first. Tap two cards to flip them.
-3. Match a pair → score a point **and go again**.
-4. Miss → it's the other player's turn (**💙 Her**).
-5. When all pairs are found, the player with the most pairs wins! 🎉
+- Paste any Spotify episode URL to fetch its transcript
+- View transcript with timestamps or as plain text
+- Copy full transcript, copy with timestamps, or copy individual segments
+- Episode metadata display (title, show name, cover art, duration)
 
-Press **↻ New** any time to reshuffle and start over.
+## Getting Started
 
-No installation, no internet needed — it's a single file that runs in the browser.
+```bash
+npm install
+npm start
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## Usage
+
+1. Find a podcast episode on Spotify
+2. Copy its share link (e.g. `https://open.spotify.com/episode/...`)
+3. Paste it into the input field and click **Get Transcript**
+4. Use the **Copy Transcript** button to copy the full text
+
+## Notes
+
+- Not all Spotify podcast episodes have transcripts available
+- Transcripts are fetched from Spotify's public APIs
+- No Spotify account required

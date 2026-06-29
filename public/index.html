@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Spotify Podcast Transcripts</title>
+<style>
+  :root {
+    --bg: #121212;
+    --surface: #1e1e1e;
+    --surface-hover: #282828;
+    --surface-raised: #2a2a2a;
+    --green: #1db954;
+    --green-hover: #1ed760;
+    --text: #ffffff;
+    --text-secondary: #b3b3b3;
+    --text-dim: #727272;
+    --border: #333;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  .app {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 24px 20px 60px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+
+  .logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .logo svg { flex-shrink: 0; }
+
+  .logo h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  header p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+  }
+
+  .setup-card {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    margin-bottom: 24px;
+    display: none;
+  }
+
+  .setup-card.show { display: block; }
+
+  .setup-card h2 {
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+  }
+
+  .setup-card ol {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.8;
+    padding-left: 20px;
+    margin-bottom: 20px;
+  }
+
+  .setup-card ol li { margin-bottom: 4px; }
+
+  .setup-card code {
+    background: var(--surface-raised);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: var(--green);
+  }
+
+  .setup-card .input-row {
+    display: flex;
+    gap: 10px;
+  }
+
+  .setup-card input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    font-size: 0.9rem;
+    color: var(--text);
+    outline: none;
+    font-family: monospace;
+  }
+
+  .setup-card input:focus { border-color: var(--green); }
+
+  .connected-badge {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: rgba(29, 185, 84, 0.1);
+    border: 1px solid rgba(29, 185, 84, 0.3);
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+    font-size: 0.88rem;
+    color: var(--green);
+  }
+
+  .connected-badge.show { display: flex; }
+
+  .connected-badge .dot {
+    width: 8px;
+    height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .connected-badge button {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 0.82rem;
+    text-decoration: underline;
+  }
+
+  .connected-badge button:hover { color: var(--text-secondary); }
+
+  .input-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .input-group input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 14px 20px;
+    font-size: 0.95rem;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .input-group input::placeholder { color: var(--text-dim); }
+  .input-group input:focus { border-color: var(--green); }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+    border-radius: 999px;
+    padding: 14px 28px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-primary {
+    background: var(--green);
+    color: #000;
+  }
+  .btn-primary:hover { background: var(--green-hover); transform: scale(1.02); }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .btn-secondary {
+    background: var(--surface-raised);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { background: var(--surface-hover); border-color: var(--text-dim); }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-secondary);
+    padding: 8px 16px;
+    font-size: 0.85rem;
+  }
+  .btn-ghost:hover { color: var(--text); }
+
+  .btn-sm {
+    padding: 10px 20px;
+    font-size: 0.88rem;
+    border-radius: var(--radius);
+  }
+
+  .error {
+    background: rgba(255, 75, 75, 0.1);
+    border: 1px solid rgba(255, 75, 75, 0.3);
+    color: #ff6b6b;
+    padding: 14px 18px;
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+    font-size: 0.9rem;
+    display: none;
+  }
+
+  .error.show { display: block; }
+
+  .loading {
+    display: none;
+    text-align: center;
+    padding: 60px 20px;
+  }
+
+  .loading.show { display: block; }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading p { color: var(--text-secondary); font-size: 0.95rem; }
+
+  .result { display: none; }
+  .result.show { display: block; }
+
+  .episode-header {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    padding: 20px;
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    margin-bottom: 20px;
+  }
+
+  .episode-header img {
+    width: 80px;
+    height: 80px;
+    border-radius: var(--radius);
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+
+  .episode-info { flex: 1; min-width: 0; }
+
+  .episode-info h2 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .episode-info .show-name {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+  }
+
+  .episode-info .duration {
+    color: var(--text-dim);
+    font-size: 0.82rem;
+  }
+
+  .transcript-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .transcript-controls .spacer { flex: 1; }
+
+  .toggle-group {
+    display: flex;
+    background: var(--surface);
+    border-radius: 999px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .toggle-group button {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 8px 16px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .toggle-group button.active {
+    background: var(--green);
+    color: #000;
+  }
+
+  .transcript-box {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    max-height: 65vh;
+    overflow-y: auto;
+    line-height: 1.7;
+    font-size: 0.95rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .transcript-box::-webkit-scrollbar { width: 6px; }
+  .transcript-box::-webkit-scrollbar-track { background: transparent; }
+  .transcript-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .segment {
+    display: flex;
+    gap: 16px;
+    padding: 8px 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    cursor: pointer;
+    transition: background 0.1s;
+    border-radius: 4px;
+  }
+
+  .segment:last-child { border-bottom: none; }
+  .segment:hover { background: rgba(255,255,255,0.05); }
+
+  .segment .timestamp {
+    color: var(--green);
+    font-size: 0.82rem;
+    font-weight: 600;
+    min-width: 60px;
+    padding-top: 2px;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .segment .text {
+    color: var(--text-secondary);
+    flex: 1;
+  }
+
+  .segment:hover .text { color: var(--text); }
+
+  .plain-text {
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+
+  .copy-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--green);
+    color: #000;
+    padding: 12px 24px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 100;
+    pointer-events: none;
+  }
+
+  .copy-toast.show { transform: translateX(-50%) translateY(0); }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-dim);
+  }
+
+  .empty-state svg { margin-bottom: 16px; opacity: 0.4; }
+  .empty-state p { font-size: 0.95rem; margin-bottom: 4px; }
+  .empty-state .hint { font-size: 0.82rem; }
+
+  @media (max-width: 600px) {
+    .app { padding: 16px 14px 48px; }
+    .input-group { flex-direction: column; }
+    .setup-card .input-row { flex-direction: column; }
+    .btn { padding: 14px 20px; justify-content: center; }
+    .episode-header { flex-direction: column; align-items: center; text-align: center; }
+    .episode-info h2 { white-space: normal; }
+    .transcript-controls { flex-direction: column; }
+    .transcript-controls .spacer { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="logo">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="#1db954">
+        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381C8.64 5.801 15.6 6.001 20.1 8.82c.52.301.7 1.02.4 1.56-.301.42-1.02.599-1.42.3z"/>
+      </svg>
+      <h1>Podcast Transcripts</h1>
+    </div>
+    <p>Paste a Spotify episode link to get the transcript</p>
+  </header>
+
+  <div class="setup-card" id="setupCard">
+    <h2>One-time setup: Connect your Spotify</h2>
+    <ol>
+      <li>Open <code>open.spotify.com</code> in your browser and log in</li>
+      <li>Press <code>F12</code> to open DevTools</li>
+      <li>Go to <strong>Application</strong> tab &rarr; <strong>Cookies</strong> &rarr; <code>https://open.spotify.com</code></li>
+      <li>Find the cookie named <code>sp_dc</code> and copy its <strong>Value</strong></li>
+      <li>Paste it below</li>
+    </ol>
+    <div class="input-row">
+      <input type="password" id="cookieInput" placeholder="Paste your sp_dc cookie value here..." />
+      <button class="btn btn-primary btn-sm" onclick="saveCookie()">Connect</button>
+    </div>
+  </div>
+
+  <div class="connected-badge" id="connectedBadge">
+    <span class="dot"></span>
+    <span>Spotify connected</span>
+    <button onclick="showSetup()">Change</button>
+  </div>
+
+  <div class="input-group" id="mainInput" style="display:none">
+    <input type="text" id="urlInput" placeholder="https://open.spotify.com/episode/..." spellcheck="false" />
+    <button class="btn btn-primary" id="fetchBtn" onclick="fetchTranscript()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+      </svg>
+      Get Transcript
+    </button>
+  </div>
+
+  <div class="error" id="error"></div>
+
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p>Fetching transcript...</p>
+  </div>
+
+  <div class="result" id="result">
+    <div class="episode-header">
+      <img id="episodeCover" src="" alt="Cover" />
+      <div class="episode-info">
+        <h2 id="episodeTitle"></h2>
+        <div class="show-name" id="showName"></div>
+        <div class="duration" id="duration"></div>
+      </div>
+    </div>
+
+    <div class="transcript-controls">
+      <button class="btn btn-secondary" onclick="copyTranscript()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+        </svg>
+        Copy Transcript
+      </button>
+
+      <button class="btn btn-ghost" onclick="copyWithTimestamps()">Copy with Timestamps</button>
+
+      <div class="spacer"></div>
+
+      <div class="toggle-group">
+        <button class="active" id="viewTimed" onclick="setView('timed')">Timed</button>
+        <button id="viewPlain" onclick="setView('plain')">Plain</button>
+      </div>
+    </div>
+
+    <div class="transcript-box" id="transcriptBox"></div>
+  </div>
+
+  <div class="empty-state" id="emptyState">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+    </svg>
+    <p>No transcript loaded yet</p>
+    <p class="hint">Paste a Spotify episode URL above to get started</p>
+  </div>
+</div>
+
+<div class="copy-toast" id="toast">Copied to clipboard!</div>
+
+<script>
+  let currentData = null;
+  let currentView = "timed";
+
+  const urlInput = document.getElementById("urlInput");
+  const errorEl = document.getElementById("error");
+  const loadingEl = document.getElementById("loading");
+  const resultEl = document.getElementById("result");
+  const emptyStateEl = document.getElementById("emptyState");
+  const transcriptBox = document.getElementById("transcriptBox");
+  const toastEl = document.getElementById("toast");
+  const setupCard = document.getElementById("setupCard");
+  const connectedBadge = document.getElementById("connectedBadge");
+  const mainInput = document.getElementById("mainInput");
+
+  async function checkStatus() {
+    try {
+      const res = await fetch("/api/status");
+      const data = await res.json();
+      if (data.hasCookie) {
+        showConnected();
+      } else {
+        showSetup();
+      }
+    } catch {
+      showSetup();
+    }
+  }
+
+  function showConnected() {
+    setupCard.classList.remove("show");
+    connectedBadge.classList.add("show");
+    mainInput.style.display = "flex";
+    urlInput.focus();
+  }
+
+  function showSetup() {
+    setupCard.classList.add("show");
+    connectedBadge.classList.remove("show");
+    mainInput.style.display = "none";
+    document.getElementById("cookieInput").focus();
+  }
+
+  async function saveCookie() {
+    const cookie = document.getElementById("cookieInput").value.trim();
+    if (!cookie) {
+      showError("Please paste your sp_dc cookie value");
+      return;
+    }
+    hideError();
+    try {
+      const res = await fetch("/api/cookie", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cookie }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to save cookie");
+      }
+      showToast("Spotify connected!");
+      showConnected();
+    } catch (err) {
+      showError(err.message);
+    }
+  }
+
+  urlInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") fetchTranscript();
+  });
+
+  document.getElementById("cookieInput")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") saveCookie();
+  });
+
+  function formatMs(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    const pad = (n) => String(n).padStart(2, "0");
+    return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+  }
+
+  function formatDuration(ms) {
+    const totalMin = Math.round(ms / 60000);
+    if (totalMin >= 60) {
+      const h = Math.floor(totalMin / 60);
+      const m = totalMin % 60;
+      return `${h} hr ${m} min`;
+    }
+    return `${totalMin} min`;
+  }
+
+  function showError(msg) {
+    errorEl.textContent = msg;
+    errorEl.classList.add("show");
+  }
+
+  function hideError() { errorEl.classList.remove("show"); }
+
+  function showToast(msg) {
+    toastEl.textContent = msg || "Copied to clipboard!";
+    toastEl.classList.add("show");
+    setTimeout(() => toastEl.classList.remove("show"), 2000);
+  }
+
+  function extractEpisodeId(input) {
+    const trimmed = input.trim();
+    const patterns = [
+      /spotify\.com\/episode\/([a-zA-Z0-9]{22})/,
+      /spotify:episode:([a-zA-Z0-9]{22})/,
+      /^([a-zA-Z0-9]{22})$/,
+    ];
+    for (const p of patterns) {
+      const m = trimmed.match(p);
+      if (m) return m[1];
+    }
+    return null;
+  }
+
+  async function fetchTranscript() {
+    const input = urlInput.value.trim();
+    if (!input) { showError("Please enter a Spotify episode URL"); return; }
+
+    const episodeId = extractEpisodeId(input);
+    if (!episodeId) {
+      showError("Could not find a valid Spotify episode ID. Paste a URL like: https://open.spotify.com/episode/...");
+      return;
+    }
+
+    hideError();
+    loadingEl.classList.add("show");
+    resultEl.classList.remove("show");
+    emptyStateEl.style.display = "none";
+    document.getElementById("fetchBtn").disabled = true;
+
+    try {
+      const res = await fetch(`/api/transcript/${episodeId}`);
+      const data = await res.json();
+
+      if (res.status === 401 && data.error === "NO_COOKIE") {
+        showSetup();
+        throw new Error("Please connect your Spotify account first");
+      }
+
+      if (!res.ok) throw new Error(data.error || "Failed to fetch transcript");
+
+      if (!data.sections || data.sections.length === 0) {
+        throw new Error("This episode does not have a transcript available on Spotify");
+      }
+
+      currentData = data;
+      renderResult(data);
+    } catch (err) {
+      showError(err.message);
+      emptyStateEl.style.display = "block";
+    } finally {
+      loadingEl.classList.remove("show");
+      document.getElementById("fetchBtn").disabled = false;
+    }
+  }
+
+  function renderResult(data) {
+    const cover = document.getElementById("episodeCover");
+    if (data.image) { cover.src = data.image; cover.style.display = "block"; }
+    else { cover.style.display = "none"; }
+
+    document.getElementById("episodeTitle").textContent = data.title || "Podcast Episode";
+    document.getElementById("showName").textContent = data.show || "";
+    document.getElementById("duration").textContent = data.duration ? formatDuration(data.duration) : "";
+
+    renderTranscript();
+    resultEl.classList.add("show");
+  }
+
+  function renderTranscript() {
+    if (!currentData) return;
+    if (currentView === "timed") {
+      transcriptBox.innerHTML = currentData.sections
+        .map(s =>
+          `<div class="segment" onclick="copySegment(this)">
+            <span class="timestamp">${formatMs(s.startMs)}</span>
+            <span class="text">${escapeHtml(s.text)}</span>
+          </div>`
+        ).join("");
+    } else {
+      const fullText = currentData.sections.map(s => s.text).join("\n\n");
+      transcriptBox.innerHTML = `<div class="plain-text">${escapeHtml(fullText)}</div>`;
+    }
+  }
+
+  function escapeHtml(str) {
+    const d = document.createElement("div");
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  function setView(view) {
+    currentView = view;
+    document.getElementById("viewTimed").classList.toggle("active", view === "timed");
+    document.getElementById("viewPlain").classList.toggle("active", view === "plain");
+    renderTranscript();
+  }
+
+  function copyTranscript() {
+    if (!currentData) return;
+    const text = currentData.sections.map(s => s.text).join("\n\n");
+    navigator.clipboard.writeText(text).then(() => showToast());
+  }
+
+  function copyWithTimestamps() {
+    if (!currentData) return;
+    const text = currentData.sections.map(s => `[${formatMs(s.startMs)}] ${s.text}`).join("\n\n");
+    navigator.clipboard.writeText(text).then(() => showToast("Copied with timestamps!"));
+  }
+
+  function copySegment(el) {
+    const text = el.querySelector(".text").textContent;
+    navigator.clipboard.writeText(text).then(() => showToast("Segment copied!"));
+  }
+
+  checkStatus();
+</script>
+</body>
+</html>
